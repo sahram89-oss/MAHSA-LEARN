@@ -10,7 +10,8 @@ export const INITIAL_USERS: User[] = [
     xp: 1250,
     streak: 5,
     badges: ['b1', 'b2'],
-    completedCourses: []
+    completedCourses: [],
+    quizAttempts: []
   },
   {
     id: '54321',
@@ -21,7 +22,8 @@ export const INITIAL_USERS: User[] = [
     xp: 850,
     streak: 2,
     badges: ['b1'],
-    completedCourses: []
+    completedCourses: [],
+    quizAttempts: []
   },
   {
     id: '99901',
@@ -32,7 +34,8 @@ export const INITIAL_USERS: User[] = [
     xp: 2100,
     streak: 12,
     badges: ['b1', 'b2', 'b3'],
-    completedCourses: []
+    completedCourses: [],
+    quizAttempts: []
   },
   {
     id: 'admin',
@@ -43,7 +46,8 @@ export const INITIAL_USERS: User[] = [
     xp: 0,
     streak: 0,
     badges: [],
-    completedCourses: []
+    completedCourses: [],
+    quizAttempts: []
   }
 ];
 

@@ -3,7 +3,7 @@ import LoginScreen from './components/LoginScreen';
 import NurseDashboard from './components/NurseDashboard';
 import EducatorDashboard from './components/EducatorDashboard';
 import CoursePlayer from './components/CoursePlayer';
-import { User, Course, AuthState } from './types';
+import { User, Course, AuthState, QuizAttempt } from './types';
 import { INITIAL_USERS, INITIAL_COURSES } from './services/mockData';
 
 function App() {
@@ -95,6 +95,32 @@ function App() {
 
   const handleStartCourse = (course: Course) => {
     setActiveCourse(course);
+  };
+
+  // Triggered on every quiz answer attempt
+  const handleQuizAttempt = (courseId: string, slideId: string, question: string, answer: string, isCorrect: boolean) => {
+    if (!auth.currentUser) return;
+    
+    const attempt: QuizAttempt = {
+      courseId,
+      slideId,
+      question,
+      selectedOption: answer,
+      isCorrect,
+      timestamp: Date.now()
+    };
+
+    const updatedUsers = users.map(u => {
+      if (u.id === auth.currentUser?.id) {
+         // Create new array if quizAttempts is undefined (legacy data)
+         return { ...u, quizAttempts: [...(u.quizAttempts || []), attempt] };
+      }
+      return u;
+    });
+    
+    setUsers(updatedUsers);
+    // Update auth user ref to ensure consistency during the session
+    setAuth(prev => ({ ...prev, currentUser: updatedUsers.find(u => u.id === prev.currentUser?.id) || null }));
   };
 
   const handleCompleteCourse = (courseId: string, earnedXp: number) => {
@@ -242,6 +268,7 @@ function App() {
 
             {auth.currentUser?.role === 'Educator' && (
               <EducatorDashboard 
+                user={auth.currentUser}
                 users={users}
                 courses={courses}
                 onAddCourse={handleAddCourse}
@@ -260,6 +287,7 @@ function App() {
                 course={activeCourse} 
                 onClose={() => setActiveCourse(null)}
                 onComplete={handleCompleteCourse}
+                onQuizAttempt={handleQuizAttempt}
               />
             )}
           </>

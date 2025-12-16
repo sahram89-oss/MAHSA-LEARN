@@ -1,5 +1,14 @@
 export type Role = 'Nurse' | 'Educator';
 
+export interface QuizAttempt {
+  courseId: string;
+  slideId: string;
+  question: string;
+  selectedOption: string;
+  isCorrect: boolean;
+  timestamp: number;
+}
+
 export interface User {
   id: string;
   pin: string;
@@ -10,6 +19,7 @@ export interface User {
   streak: number;
   badges: string[]; // Array of Badge IDs
   completedCourses: string[]; // Array of course IDs
+  quizAttempts?: QuizAttempt[]; // History of all quiz answers
 }
 
 export type SlideType = 'intro' | 'video' | 'quiz' | 'summary';

@@ -7,11 +7,12 @@ interface CoursePlayerProps {
   course: Course;
   onClose: () => void;
   onComplete: (courseId: string, xp: number) => void;
+  onQuizAttempt?: (courseId: string, slideId: string, question: string, answer: string, isCorrect: boolean) => void;
 }
 
 const XP_PER_SLIDE = 50;
 
-const CoursePlayer: React.FC<CoursePlayerProps> = ({ course, onClose, onComplete }) => {
+const CoursePlayer: React.FC<CoursePlayerProps> = ({ course, onClose, onComplete, onQuizAttempt }) => {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [isAnswerChecked, setIsAnswerChecked] = useState(false);
@@ -75,6 +76,17 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ course, onClose, onComplete
       // Mark this slide as failed. Even if they get it right later, no XP.
       setFailedSlides(prev => new Set(prev).add(slide.id));
     }
+
+    // Record the attempt
+    if (onQuizAttempt) {
+      onQuizAttempt(
+        course.id,
+        slide.id,
+        slide.quizData.question,
+        slide.quizData.options[selectedOption],
+        correct
+      );
+    }
   };
 
   const renderContent = () => {
@@ -120,12 +132,15 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ course, onClose, onComplete
           </div>
         );
       case 'quiz':
+        // Determine if this slide is already "failed" regarding XP
+        const isFailed = failedSlides.has(slide.id);
+        
         return (
           <div className="flex flex-col w-full px-2">
              <div className="flex justify-between items-start mb-6">
                 <h2 className="text-xl font-bold text-mahsa-navy">{slide.quizData?.question}</h2>
-                <div className="bg-orange-100 text-orange-600 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide whitespace-nowrap ml-2">
-                  {XP_PER_SLIDE} XP
+                <div className={`${isFailed ? 'bg-slate-100 text-slate-500' : 'bg-orange-100 text-orange-600'} px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide whitespace-nowrap ml-2 transition-colors`}>
+                  {isFailed ? '0 XP (Retry)' : `${XP_PER_SLIDE} XP`}
                 </div>
              </div>
              
@@ -180,7 +195,7 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ course, onClose, onComplete
                     <p className="font-bold text-sm">{isCorrect ? "Correct!" : "Incorrect"}</p>
                     <p className="text-sm opacity-90">
                       {isCorrect 
-                        ? (failedSlides.has(slide.id) ? "Good job fixing it, but no XP for retries." : "Great job! You earned 50 XP.") 
+                        ? (isFailed ? "Good job fixing it, but no XP for retries." : "Great job! You earned 50 XP.") 
                         : "Review the options and try again. No XP will be awarded for this slide."}
                     </p>
                  </div>
