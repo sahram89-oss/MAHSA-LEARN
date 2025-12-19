@@ -3,7 +3,7 @@ import { Slide, Course, SlideType } from '../types';
 import Button from './Button';
 import Input from './Input';
 import CoursePlayer from './CoursePlayer';
-import { Plus, Trash2, Save, X, ChevronLeft, Image, Video, HelpCircle, FileText, CheckCircle2, Pencil, GripVertical, Eye, ChevronDown, LayoutTemplate } from 'lucide-react';
+import { Plus, Trash2, Save, X, ChevronLeft, Image, Video, HelpCircle, FileText, CheckCircle2, Pencil, GripVertical, Eye, ChevronDown, LayoutTemplate, Code } from 'lucide-react';
 
 interface CourseBuilderProps {
   initialCourse?: Course;
@@ -70,18 +70,36 @@ const CourseBuilder: React.FC<CourseBuilderProps> = ({ onSave, onCancel, initial
     }
   };
 
-  // Helper to extract video ID and create embed URL
-  const getEmbedUrl = (url: string) => {
-    if (!url) return '';
-    // Handle standard watch URLs, short URLs, and existing embed URLs
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
+  /**
+   * REFINED helper for YouTube Embeds
+   * 1. If user pastes full <iframe>, we extract the src and keep it AS IS.
+   * 2. This ensures whatever parameters YouTube generated (rel, si, etc) are preserved.
+   * 3. Removed 'origin' parameter which causes most 'Configuration Error' (153) issues.
+   */
+  const getEmbedUrl = (input: string) => {
+    if (!input) return '';
+    
+    let url = input.trim();
 
-    if (match && match[2].length === 11) {
-      return `https://www.youtube.com/embed/${match[2]}`;
+    // 1. If user pasted a full iframe code, extract the src attribute and keep it exactly as provided
+    if (url.toLowerCase().startsWith('<iframe')) {
+      const srcMatch = url.match(/src=["']([^"']+)["']/i);
+      if (srcMatch && srcMatch[1]) {
+        // We use the URL exactly as YouTube provided it in the embed code
+        return srcMatch[1];
+      }
     }
     
-    // Return original if no match (could be already valid or non-youtube)
+    // 2. If it's a standard link, convert to a clean embed format
+    // Removed all extra parameters like 'origin' and 'enablejsapi' that cause security rejections
+    const youtubeRegExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]{11}).*/;
+    const match = url.match(youtubeRegExp);
+
+    if (match && match[2]) {
+      const videoId = match[2];
+      return `https://www.youtube.com/embed/${videoId}`;
+    }
+    
     return url;
   };
 
@@ -108,7 +126,7 @@ const CourseBuilder: React.FC<CourseBuilderProps> = ({ onSave, onCancel, initial
         options: quizOptions.filter(o => o.trim() !== ''),
         correctIndex: quizCorrectIdx
       };
-      newSlide.title = "Knowledge Check"; // Default title for quizzes
+      newSlide.title = "Knowledge Check";
     }
 
     if (editingSlideId) {
@@ -123,18 +141,14 @@ const CourseBuilder: React.FC<CourseBuilderProps> = ({ onSave, onCancel, initial
   const handleEditSlide = (slide: Slide) => {
     setEditingSlideId(slide.id);
     setActiveSlideType(slide.type);
-    
-    // Populate form
     setSlideTitle(slide.title);
     setSlideContent(slide.content || '');
     setSlideImage(slide.image || '');
-    
     if (slide.type === 'quiz' && slide.quizData) {
       setQuizQuestion(slide.quizData.question);
       setQuizOptions([...slide.quizData.options]);
       setQuizCorrectIdx(slide.quizData.correctIndex);
     }
-
     setMode('add-slide');
   };
 
@@ -144,20 +158,17 @@ const CourseBuilder: React.FC<CourseBuilderProps> = ({ onSave, onCancel, initial
 
   const handleSaveCourse = () => {
     if (!title || !category || slides.length === 0) return;
-    
     onSave({
       title,
       category,
       slides,
-      durationMinutes: slides.length * 2, // Estimate 2 mins per slide
-      xpReward: slides.length * 50 // Estimate 50 XP per slide
+      durationMinutes: slides.length * 2,
+      xpReward: slides.length * 50
     });
   };
 
   const handlePreview = () => {
-    if (!title || !category || slides.length === 0) {
-        return; 
-    }
+    if (!title || !category || slides.length === 0) return; 
     setIsPreviewing(true);
   };
 
@@ -180,31 +191,25 @@ const CourseBuilder: React.FC<CourseBuilderProps> = ({ onSave, onCancel, initial
     }
   };
 
-  // --- Drag and Drop Handlers ---
-
   const onDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIdx(index);
     e.dataTransfer.effectAllowed = 'move';
   };
 
   const onDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault(); // Allow dropping
+    e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   };
 
   const onDrop = (e: React.DragEvent, dropIndex: number) => {
     e.preventDefault();
     if (draggedIdx === null || draggedIdx === dropIndex) return;
-
     const newSlides = [...slides];
     const [draggedItem] = newSlides.splice(draggedIdx, 1);
     newSlides.splice(dropIndex, 0, draggedItem);
-    
     setSlides(newSlides);
     setDraggedIdx(null);
   };
-
-  // --- Render Helpers ---
 
   const renderSlideTypeSelection = () => (
     <div className="grid grid-cols-3 gap-3 mb-6">
@@ -281,15 +286,22 @@ const CourseBuilder: React.FC<CourseBuilderProps> = ({ onSave, onCancel, initial
           )}
 
           {activeSlideType === 'video' && (
-            <>
-               <Input 
-                label="YouTube Video URL" 
-                value={slideContent} 
-                onChange={e => setSlideContent(e.target.value)} 
-                placeholder="https://www.youtube.com/watch?v=..."
-              />
-               <p className="text-xs text-slate-400">Paste a YouTube link (Watch, Share, or Embed format).</p>
-            </>
+            <div className="space-y-4">
+               <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium text-slate-600 ml-1 flex items-center gap-2">
+                    <Code size={14} className="text-mahsa-teal" /> Video URL or Embed Code
+                  </label>
+                  <textarea 
+                    className="p-3 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-mahsa-teal min-h-[100px] text-sm font-mono"
+                    value={slideContent}
+                    onChange={e => setSlideContent(e.target.value)}
+                    placeholder={`Paste the <iframe ...> code here`}
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1 px-1">
+                    Paste the full <b>&lt;iframe&gt;</b> code from YouTube (Share > Embed).
+                  </p>
+               </div>
+            </div>
           )}
 
           {activeSlideType === 'quiz' && (
@@ -351,7 +363,6 @@ const CourseBuilder: React.FC<CourseBuilderProps> = ({ onSave, onCancel, initial
     );
   };
 
-  // If previewing, show the CoursePlayer
   if (isPreviewing) {
     return (
       <CoursePlayer 
@@ -364,8 +375,6 @@ const CourseBuilder: React.FC<CourseBuilderProps> = ({ onSave, onCancel, initial
 
   return (
     <div className="absolute inset-0 z-50 bg-white flex flex-col animate-in slide-in-from-bottom duration-300">
-      
-      {/* Top Header */}
       <div className="bg-white px-4 py-4 border-b border-slate-100 flex justify-between items-center shadow-sm">
         <h2 className="text-lg font-bold text-mahsa-navy">
           {initialCourse ? 'Edit Course' : 'Create New Course'}
@@ -378,15 +387,11 @@ const CourseBuilder: React.FC<CourseBuilderProps> = ({ onSave, onCancel, initial
       <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
         {mode === 'overview' ? (
           <div className="space-y-6 animate-in fade-in duration-300">
-            {/* Course Info Section */}
             <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
               <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Course Details</h3>
               <Input label="Title" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Sharp Object Safety" />
-              
-              {/* Custom Category Selection UI */}
               <div className="flex flex-col gap-1 mb-4">
                 <label className="text-sm font-medium text-slate-600 ml-1">Category</label>
-                
                 {!isNewCategoryMode && availableCategories.length > 0 ? (
                   <div className="flex gap-2">
                     <div className="relative flex-1">
@@ -427,16 +432,13 @@ const CourseBuilder: React.FC<CourseBuilderProps> = ({ onSave, onCancel, initial
               </div>
             </div>
 
-            {/* Slides List Section */}
             <div>
               <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Course Content ({slides.length})</h3>
-              
               {slides.length === 0 && (
                 <div className="text-center py-8 border-2 border-dashed border-slate-200 rounded-2xl">
                   <p className="text-slate-400 text-sm">No slides added yet.</p>
                 </div>
               )}
-
               <div className="space-y-3 mb-6">
                 {slides.map((s, i) => {
                   const style = getSlideTypeStyles(s.type);
@@ -450,49 +452,24 @@ const CourseBuilder: React.FC<CourseBuilderProps> = ({ onSave, onCancel, initial
                     className={`group bg-white p-3 pr-2 rounded-xl border flex items-center justify-between shadow-sm transition-all hover:shadow-md cursor-move ${draggedIdx === i ? 'opacity-50 border-mahsa-teal border-dashed' : 'border-slate-100'}`}
                   >
                     <div className="flex items-center gap-3 flex-1 overflow-hidden">
-                      <div className="text-slate-300 cursor-grab active:cursor-grabbing hover:text-slate-500 px-1">
-                        <GripVertical size={20} />
-                      </div>
-                      
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${style.bg} ${style.text}`}>
-                        {style.icon}
-                      </div>
-
+                      <div className="text-slate-300 cursor-grab px-1"><GripVertical size={20} /></div>
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${style.bg} ${style.text}`}>{style.icon}</div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
-                           <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
-                             #{i + 1}
-                           </span>
-                           <span className={`text-[10px] font-bold uppercase tracking-wider ${style.text}`}>
-                             {style.label}
-                           </span>
+                           <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">#{i + 1}</span>
+                           <span className={`text-[10px] font-bold uppercase tracking-wider ${style.text}`}>{style.label}</span>
                         </div>
                         <p className="font-semibold text-slate-800 text-sm truncate pr-2">{s.title}</p>
                       </div>
                     </div>
-                    
                     <div className="flex items-center gap-1 pl-2 border-l border-slate-100">
-                      <button 
-                        onClick={() => handleEditSlide(s)} 
-                        className="p-2 text-slate-400 hover:text-mahsa-teal hover:bg-cyan-50 rounded-lg transition-colors"
-                        title="Edit Slide"
-                      >
-                        <Pencil size={18} />
-                      </button>
-                      <button 
-                        onClick={() => removeSlide(s.id)} 
-                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Remove Slide"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                      <button onClick={() => handleEditSlide(s)} className="p-2 text-slate-400 hover:text-mahsa-teal hover:bg-cyan-50 rounded-lg transition-colors"><Pencil size={18} /></button>
+                      <button onClick={() => removeSlide(s.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={18} /></button>
                     </div>
                   </div>
                   );
                 })}
               </div>
-
-              {/* Add Slide Buttons */}
               <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Add New Slide</h3>
               {renderSlideTypeSelection()}
             </div>
@@ -502,24 +479,12 @@ const CourseBuilder: React.FC<CourseBuilderProps> = ({ onSave, onCancel, initial
         )}
       </div>
 
-      {/* Footer Actions */}
       {mode === 'overview' && (
         <div className="p-4 bg-white border-t border-slate-100 flex gap-3">
-          <Button 
-            variant="outline"
-            className="flex-1 flex items-center justify-center gap-2"
-            onClick={handlePreview}
-            disabled={!title || !category || slides.length === 0}
-            title="Preview Course"
-          >
+          <Button variant="outline" className="flex-1 flex items-center justify-center gap-2" onClick={handlePreview} disabled={!title || !category || slides.length === 0}>
              <Eye size={20} /> Preview
           </Button>
-
-          <Button 
-            className="flex-[2] flex items-center justify-center gap-2"
-            onClick={handleSaveCourse} 
-            disabled={!title || !category || slides.length === 0}
-          >
+          <Button className="flex-[2] flex items-center justify-center gap-2" onClick={handleSaveCourse} disabled={!title || !category || slides.length === 0}>
             <Save size={20} /> {initialCourse ? 'Update' : 'Publish'}
           </Button>
         </div>
